@@ -1,0 +1,6 @@
+.env
+venv
+run_tests.py
+
+__pycache__
+my-app
