@@ -124,7 +124,9 @@ async def websocket_endpoint(client_ws: WebSocket):
                         else:
                             print("-> Lỗi/Không nhận diện được giọng nói.")
                 except Exception as e:
-                    print(f"Lỗi phần xử lý Audio/Agent: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    print(f"Lỗi phần xử lý Audio/Agent: {repr(e)}")
             elif msg_data.get("type") == "text":
                 # (Tương lai có thể hỗ trợ Frontend gửi text chat trực tiếp)
                 pass

@@ -104,7 +104,7 @@ const BottomNav = ({ activeTab }: { activeTab: string }) => (
   </nav>
 );
 
-const VoiceInteractionBar = ({ onCancel, onVoiceStart, onVoiceEnd, isRecording, isProcessing }: { onCancel: () => void; onVoiceStart?: () => void; onVoiceEnd?: () => void; isRecording?: boolean; isProcessing?: boolean }) => (
+const VoiceInteractionBar = ({ onCancel, onVoiceStart, onVoiceEnd, isRecording }: { onCancel: () => void; onVoiceStart?: () => void; onVoiceEnd?: () => void; isRecording?: boolean }) => (
   <div className="w-full flex flex-col items-center relative z-50">
     <div className="w-full bg-white/90 backdrop-blur-2xl rounded-t-[3.5rem] shadow-[0_-8px_32px_rgba(0,0,0,0.1)] pt-10 pb-12 px-6">
       <div className="max-w-md mx-auto flex items-center justify-between gap-6">
@@ -121,21 +121,21 @@ const VoiceInteractionBar = ({ onCancel, onVoiceStart, onVoiceEnd, isRecording, 
         <div className="flex flex-col items-center gap-4">
           <div className="relative pointer-events-auto">
             <motion.div 
-              animate={{ scale: isRecording ? [1, 1.3, 1] : isProcessing ? [1, 1.2, 1] : 1 }}
+              animate={{ scale: isRecording ? [1, 1.3, 1] : 1 }}
               transition={{ repeat: Infinity, duration: 1 }}
-              className={`absolute inset-0 rounded-full ${isRecording ? 'bg-red-500/20' : isProcessing ? 'bg-primary/20' : ''}`}
+              className={`absolute inset-0 rounded-full ${isRecording ? 'bg-red-500/20' : ''}`}
             />
             <button 
               onPointerDown={onVoiceStart}
               onPointerUp={onVoiceEnd}
               onPointerLeave={onVoiceEnd}
-              className={`relative z-10 w-28 h-28 rounded-full bg-gradient-to-br from-primary to-primary-container text-white shadow-xl flex items-center justify-center transition-all ${isRecording ? 'scale-90 !bg-red-500 opacity-90' : 'active:scale-95'} ${isProcessing ? 'animate-pulse' : ''}`}
+              className={`relative z-10 w-28 h-28 rounded-full bg-gradient-to-br from-primary to-primary-container text-white shadow-xl flex items-center justify-center transition-all ${isRecording ? 'scale-90 !bg-red-500 !from-red-500 !to-red-600 opacity-90' : 'active:scale-95'}`}
             >
               <Mic className="w-12 h-12" />
             </button>
           </div>
           <span className={`font-black text-sm tracking-[0.2em] uppercase ${isRecording ? 'text-red-500 animate-pulse' : 'text-primary'}`}>
-            {isRecording ? 'Recording...' : isProcessing ? 'Processing...' : 'Hold to Speak'}
+            {isRecording ? 'Recording...' : 'Hold to Speak'}
           </span>
         </div>
 
@@ -262,7 +262,7 @@ const MessageBubble = ({ message, onAction }: { message: Message; onAction?: (da
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
   const [messages, setMessages] = useState<Message[]>([]);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [isUserTyping, setIsUserTyping] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [tripData, setTripData] = useState<TripData>({ pickup: '', destination: '' });
   const [isTyping, setIsTyping] = useState(false);
@@ -289,7 +289,7 @@ export default function App() {
         const data = JSON.parse(event.data);
         if (data.type === 'user_message') {
            addMessage({ id: Date.now().toString(), role: 'user', content: data.text });
-           setIsProcessing(false);
+           setIsUserTyping(false);
            setIsTyping(true);
         } else if (data.type === 'agent_response') {
            setIsTyping(false);
@@ -298,12 +298,21 @@ export default function App() {
            setIsTyping(true);
            if (data.tool_name === 'check_vehicle' || data.tool_name === 'get_vehicle_info') {
               setIsTyping(false);
-              addMessage({
-                id: Date.now().toString(),
-                role: 'assistant',
-                content: "Vui lòng chọn loại xe:",
-                type: 'vehicle-selection'
-              });
+              const args = typeof data.args === 'string' ? JSON.parse(data.args) : (data.args || {});
+              const vType = args.vehicle_type || 'Tùy chọn';
+              
+              // CHỈ HIỂN THỊ dialog hỏi loại xe khi Agent cố tình gửi "Tùy chọn" hoặc thiếu thông tin,
+              // Tránh hiện khi Agent validation (check_vehicle) xe người dùng vừa voice xong.
+              if (vType === 'Tùy chọn' || data.tool_name === 'get_vehicle_info') {
+                  // Tự động disable toàn bộ card vehicle-selection CŨ
+                  setMessages(prev => prev.map(m => m.type === 'vehicle-selection' ? { ...m, disabled: true } : m));
+                  addMessage({
+                    id: Date.now().toString(),
+                    role: 'assistant',
+                    content: "Vui lòng chọn loại xe:",
+                    type: 'vehicle-selection'
+                  });
+              }
            } else if (data.tool_name === 'book_ride') {
               setIsTyping(false);
               try {
@@ -311,8 +320,13 @@ export default function App() {
                   const vType = args.vehicle_type || 'taxi';
                   const selectedV = VEHICLES.find(v => v.type.toLowerCase().includes(vType.toLowerCase())) || VEHICLES[0];
                   
-                  const activeTrip = { pickup: args.pickup, destination: args.destination, selectedVehicle: selectedV };
+                  // Đọc 'origin' thay vì 'pickup' theo đúng định nghĩa tool của Python!
+                  const pickupLoc = args.origin || args.pickup || 'Vị trí hiện tại';
+                  const activeTrip = { pickup: pickupLoc, destination: args.destination, selectedVehicle: selectedV };
                   setTripData(activeTrip);
+
+                  // Tự disable mọi card cũ nếu đang có
+                  setMessages(prev => prev.map(m => (m.type === 'trip-summary' || m.type === 'vehicle-selection' ? { ...m, disabled: true } : m)));
 
                   addMessage({
                     id: Date.now().toString(),
@@ -391,7 +405,7 @@ export default function App() {
        wsRef.current.send(JSON.stringify({ type: 'text', data: `Tôi chọn xe ${v.name}` }));
     }
     
-    // Disable in UI
+    // Disable old cards so user won't press again
     setMessages(prev => prev.map(m => m.type === 'vehicle-selection' ? { ...m, disabled: true } : m));
   };
 
@@ -406,6 +420,8 @@ export default function App() {
   const handleCancel = () => {
     setCurrentScreen('home');
     setMessages([]);
+    setIsUserTyping(false);
+    setIsTyping(false);
     setTripData({ pickup: '', destination: '' });
   };
 
@@ -432,10 +448,7 @@ export default function App() {
     if (mediaRecorderRef.current && mediaRecorderRef.current.getState() === 'recording') {
       mediaRecorderRef.current.stopRecording(() => {
         setIsRecording(false);
-        setIsProcessing(true); // Hiển thị xử lý sau khi nhả nút
-        
-        // Auto-disable interaction messages up to this point
-        setMessages(prev => prev.map(m => (m.type === 'trip-summary' || m.type === 'vehicle-selection' ? { ...m, disabled: true } : m)));
+        setIsUserTyping(true); // Hiển thị typing của user
         
         const audioBlob = mediaRecorderRef.current.getBlob(); 
         const reader = new FileReader();
@@ -592,13 +605,26 @@ export default function App() {
                       </div>
                     </motion.div>
                   )}
+                  {isUserTyping && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="flex justify-end mb-6"
+                    >
+                      <div className="bg-primary/10 p-4 rounded-3xl rounded-tr-none shadow-md flex gap-1">
+                        <motion.div animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 0.6, delay: 0 }} className="w-2 h-2 bg-on-surface rounded-full" />
+                        <motion.div animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 0.6, delay: 0.2 }} className="w-2 h-2 bg-on-surface rounded-full" />
+                        <motion.div animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 0.6, delay: 0.4 }} className="w-2 h-2 bg-on-surface rounded-full" />
+                      </div>
+                    </motion.div>
+                  )}
                   <div ref={bottomRef} className="h-4" />
                 </div>
               </div>
               
               <div className="shrink-0 w-full relative z-20 mt-auto pointer-events-none">
                 <div className="pointer-events-auto">
-                  <VoiceInteractionBar onCancel={handleCancel} onVoiceStart={handleVoiceStart} onVoiceEnd={handleVoiceEnd} isRecording={isRecording} isProcessing={isProcessing} />
+                  <VoiceInteractionBar onCancel={handleCancel} onVoiceStart={handleVoiceStart} onVoiceEnd={handleVoiceEnd} isRecording={isRecording} />
                 </div>
               </div>
             </motion.div>

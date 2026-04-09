@@ -15,32 +15,36 @@ VEHICLE_TYPES = {
     "vf 5": "VF5",
     "vf8": "VF8",
     "vf 8": "VF8",
+    "vf9": "VF9",
+    "vf 9": "VF9",
     "vf3": "VF3",
     "vf 3": "VF3",
     "sang trọng": "Sang trọng",
     "lux": "Sang trọng",
-    "tiêu chuẩn": "Tiêu chuẩn"
+    "tiêu chuẩn": "Tiêu chuẩn",
+    "bike": "Xanh SM Bike",
+    "xe máy": "Xanh SM Bike",
+    "taxi": "Tiêu chuẩn"
 }
 
 @lru_cache(maxsize=100)
 def llm_correction(loc: str):
-    """Sử dụng LLM để mapping từ vựng bị STT nghe nhầm thành giá trị chuẩn thực tế, không phụ thuộc DB"""
+    """Sử dụng LLM để nắn chỉnh lỗi STT cho các địa danh thực tế ở Việt Nam"""
     if not loc:
         return []
 
-    # Bỏ hẳn vòng lặp check DB cứng ngắc. Phó mặc cho LLM.
     try:
         correction_llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
-        system_prompt = """Bạn là một chuyên gia bản đồ học (Google Maps API) chuyên nắn sửa lỗi chính tả địa danh ở Việt Nam, đặc biệt là lỗi do nhận dạng giọng nói (Speech-to-Text).
-Nhiệm vụ: Người dùng sẽ đưa cho bạn một địa danh. Địa danh này có thể đã bị bắt sai chính tả do lỗi phát âm vùng miền hoặc viết lóng. 
-Hãy sửa nó thành TÊN ĐỊA CHỈ CHUẨN XÁC, chuẩn format chữ hoa/chữ thường như trên bản đồ thực tế. 
-- Chỉ trả lời BẰNG MỘT CHUỖI NHỎ DUY NHẤT chứa tên địa điểm, TUYỆT ĐỐI không giải thích thêm.
+        system_prompt = """Bạn là một chuyên gia bản đồ học và chuyên viên tổng đài AI chuyên nghiệp.
+Nhiệm vụ: Người dùng sẽ đọc tên địa điểm ở Việt Nam bằng tiếng nói. Do lỗi Speech-to-Text, tên có thể bị sai chính tả hoặc sai lệch ngữ âm.
+Hãy đánh giá tính hợp lệ của cụm từ và trả về kết quả chuẩn nhất có thể.
 
 Quy tắc xử lý:
 1. Nếu địa danh người dùng cung cấp quá chung chung (chỉ ghi mỗi Tên Tỉnh, Tên Thành phố hoặc Tên Quận/Huyện, ví dụ: 'Thái Bình', 'Hà Nội', 'Quận 1', 'Nghệ An'), hãy trả về CHUỖI CỨNG: TOO_GENERAL
 2. Nếu từ cụm đó hoàn toàn vô nghĩa và chắc chắn không phải là một địa điểm/địa chỉ, hãy trả về CHUỖI CỨNG: NOT_FOUND
-3. Nếu hợp lệ (ví dụ: 'len mắc' -> 'Landmark 81', 'học viện bương chính viên thông' -> 'Học viện Công nghệ Bưu chính Viễn thông', 'bến xe mỹ đìn' -> 'Bến xe Mỹ Đình', 'ngõ 565 Nguyên Trái' -> 'Ngõ 565 Nguyễn Trãi'), trả về ĐÚNG CÁI TÊN ĐÓ.
-"""
+3. Nếu đó là một cụm địa chỉ hoặc địa điểm có khả năng là thật (ví dụ: 'len mắc' -> 'Landmark 81', 'học viện bương chính viên thông' -> 'Học viện Công nghệ Bưu chính Viễn thông', 'bến xe mỹ đìn' -> 'Bến xe Mỹ Đình'), hãy trả về đúng TÊN ĐÃ ĐƯỢC CHUẨN HOÁ CHÍNH TẢ.
+
+CHỈ TRẢ VỀ ĐÚNG 1 KẾT QUẢ, KHÔNG GIẢI THÍCH THÊM."""
 
         response = correction_llm.invoke([
             SystemMessage(content=system_prompt),
@@ -61,13 +65,12 @@ Quy tắc xử lý:
         return []
 
 def correct_vehicle(v: str):
-    if not v or v.lower() == "tùy chọn":
-        return "Tùy chọn"
     v_lower = v.lower().strip()
     for key, val in VEHICLE_TYPES.items():
         if key in v_lower:
             return val
-    return v # Giữ nguyên nếu không mapping được
+    # Nếu không mapping được -> Không hợp lệ! Trả về None thay vì du di
+    return None
 
 @tool
 def check_location(location: str) -> str:
@@ -90,12 +93,12 @@ def check_location(location: str) -> str:
 @tool
 def check_vehicle(vehicle_type: str) -> str:
     """
-    Sử dụng công cụ này ĐỂ KIỂM TRA LOẠI XE mong muốn (VD: VF3, VF5, Sang trọng).
+    Sử dụng công cụ này ĐỂ KIỂM TRA LOẠI XE mong muốn (VD: VF3, VF5, Sang trọng, Bike).
     Trả về loại xe chuẩn hóa hoặc lỗi nếu không hợp lệ.
     """
     final_vehicle = correct_vehicle(vehicle_type)
-    if final_vehicle == "Tùy chọn" or not final_vehicle:
-        return f'{{"status": "error", "message": "Bạn chưa chọn xe (hoặc tham số xe bị thiếu). Vui lòng hỏi người dùng muốn đi loại xe nào (ví dụ: VF3, VF5, Sang trọng...)"}}'
+    if not final_vehicle:
+        return f'{{"status": "error", "message": "Loại xe \'{vehicle_type}\' không thuộc hệ sinh thái XanhSM. Xin giải thích với người dùng rằng hệ thống chỉ cung cấp Xe Máy (Bike) hoặc Taxi Điện (Tiêu chuẩn, VF3, VF5, VF e34, VF8, VF9, Sang trọng) và yêu cầu họ chọn 1 dòng xe tương ứng."}}'
     return f'{{"status": "valid", "corrected_vehicle": "{final_vehicle}"}}'
 
 
