@@ -465,6 +465,7 @@ export default function App() {
     disconnect,
     startRecording,
     stopRecording,
+    sendTextInput,
     isConnected,
   } = useVoiceAgent(handleBackendMessage);
 
@@ -516,13 +517,19 @@ export default function App() {
   }, [stopRecording]);
 
   const handleVehicleSelect = useCallback((v: Vehicle) => {
+    // 1. Show user selection in chat
     addMessage({ id: Date.now().toString(), role: 'user', content: `Tôi chọn ${v.name}` });
     setTripData(prev => ({ ...prev, selectedVehicle: v }));
     setIsTyping(true);
 
-    // Disable previous vehicle-selection messages
+    // 2. Disable previous vehicle-selection messages
     setMessages(prev => prev.map(m => m.type === 'vehicle-selection' ? { ...m, disabled: true } : m));
 
+    // 3. Notify backend so agent can call check_vehicle + book_ride
+    sendTextInput(`Tôi muốn đặt xe ${v.name}`);
+
+    // 4. Optimistically show trip summary after agent responds
+    //    (agent_response handler will also update this if BE confirms booking)
     setTimeout(() => {
       setIsTyping(false);
       const td = { ...tripDataRef.current, selectedVehicle: v };
@@ -535,7 +542,7 @@ export default function App() {
         data: td,
       });
     }, 1000);
-  }, [addMessage]);
+  }, [addMessage, sendTextInput]);
 
   const handleAction = useCallback((action: any) => {
     if (action === 'confirm') {

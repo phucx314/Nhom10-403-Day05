@@ -203,11 +203,12 @@ export function useVoiceAgent(onMessage: (msg: BackendMessage) => void) {
     audioCtxRef.current = null;
 
     if (wsRef.current?.readyState === WebSocket.OPEN) {
-      // Signal end of audio chunk so OpenAI transcribes
+      // Commit audio → triggers transcription event (conversation.item.input_audio_transcription.completed)
+      // Do NOT send response.create — that would make OpenAI Realtime generate its own answer
+      // independently of the LangGraph agent, causing double/wrong responses.
       wsRef.current.send(JSON.stringify({ type: 'input_audio_buffer.commit' }));
-      wsRef.current.send(JSON.stringify({ type: 'response.create' }));
       setRecordingStatus('processing');
-      console.log('[Voice] Audio committed, waiting for response...');
+      console.log('[Voice] Audio committed, waiting for transcription...');
     } else {
       setRecordingStatus('idle');
     }
@@ -216,6 +217,17 @@ export function useVoiceAgent(onMessage: (msg: BackendMessage) => void) {
   // ── Cleanup on unmount ─────────────────────────────────────────────────────
 
   useEffect(() => () => { disconnect(); }, [disconnect]);
+
+  // ── Send text directly (e.g. vehicle selection from UI tap) ─────────────────
+
+  const sendTextInput = useCallback((text: string) => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      console.warn('[Voice] WS not open, cannot send text');
+      return;
+    }
+    wsRef.current.send(JSON.stringify({ type: 'text_input', text }));
+    console.log('[Voice] Sent text_input:', text);
+  }, []);
 
   // ── Return ─────────────────────────────────────────────────────────────────
 
@@ -227,6 +239,7 @@ export function useVoiceAgent(onMessage: (msg: BackendMessage) => void) {
     disconnect,
     startRecording,
     stopRecording,
+    sendTextInput,
     isConnected: connectionStatus === 'connected',
   };
 }

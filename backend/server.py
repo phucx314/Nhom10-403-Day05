@@ -50,9 +50,49 @@ async def websocket_endpoint(client_ws: WebSocket):
         }))
 
         async def client_to_openai():
+            nonlocal chat_history
             try:
                 while True:
                     data = await client_ws.receive_text()
+                    try:
+                        msg = json.loads(data)
+                        # text_input: UI-driven input (e.g. vehicle tap) → run through agent directly
+                        if msg.get("type") == "text_input":
+                            text = msg.get("text", "").strip()
+                            if text:
+                                print(f"-> [text_input] Nhận từ UI: {text}")
+                                chat_history.append(("human", text))
+                                print("-> Agent đang xử lý text_input...")
+                                result = await asyncio.to_thread(graph.invoke, {"messages": chat_history})
+                                new_messages = result["messages"][len(chat_history):]
+                                for agent_msg in new_messages:
+                                    if agent_msg.type == "tool":
+                                        print(f"-> Gửi Tool Response ({agent_msg.name}) về FE: {agent_msg.content}")
+                                        await client_ws.send_text(json.dumps({
+                                            "type": "tool_response",
+                                            "tool_name": agent_msg.name,
+                                            "content": agent_msg.content
+                                        }, ensure_ascii=False))
+                                    elif agent_msg.type == "ai":
+                                        if hasattr(agent_msg, "tool_calls") and getattr(agent_msg, "tool_calls"):
+                                            for tc in agent_msg.tool_calls:
+                                                print(f"-> Gọi tool: {tc['name']}({tc['args']})")
+                                                await client_ws.send_text(json.dumps({
+                                                    "type": "tool_call",
+                                                    "tool_name": tc['name'],
+                                                    "args": tc['args']
+                                                }, ensure_ascii=False))
+                                        if agent_msg.content:
+                                            print(f"-> Agent Response: {agent_msg.content}")
+                                            await client_ws.send_text(json.dumps({
+                                                "type": "agent_response",
+                                                "text": agent_msg.content
+                                            }, ensure_ascii=False))
+                                chat_history = list(result["messages"])
+                            continue  # don't forward text_input to OpenAI Realtime
+                    except json.JSONDecodeError:
+                        pass
+                    # Forward all other messages (audio buffer, etc.) to OpenAI Realtime
                     await openai_ws.send(data)
             except Exception as e:
                 print(f"Error reading from client: {e}")
