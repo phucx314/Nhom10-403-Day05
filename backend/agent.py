@@ -10,20 +10,19 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# 1. Đọc System Prompt
 with open("system_prompt.txt", "r", encoding="utf-8") as f:
     SYSTEM_PROMPT = f.read()
 
-# 2. Khai báo State
+
 class AgentState(TypedDict):
     messages: Annotated[list, add_messages]
 
-# 3. Khởi tạo LLM và Tools
+
 tools_list = [check_location, check_vehicle, book_ride, get_vehicle_info]
 llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 llm_with_tools = llm.bind_tools(tools_list)
 
-# 4. Agent Node
+
 def agent_node(state: AgentState):
     messages = state["messages"]
     if not isinstance(messages[0], SystemMessage):
@@ -31,7 +30,7 @@ def agent_node(state: AgentState):
         
     response = llm_with_tools.invoke(messages)
     
-    # === LOGGING ===
+   
     if response.tool_calls:
         for tc in response.tool_calls:
             print(f"Gọi tool: {tc['name']}({tc['args']})")
@@ -40,7 +39,7 @@ def agent_node(state: AgentState):
         
     return {"messages": [response]}
 
-# 5. Xây dựng Graph
+
 builder = StateGraph(AgentState)
 builder.add_node("agent", agent_node)
 
@@ -54,7 +53,7 @@ builder.add_edge("tools", "agent")
 
 graph = builder.compile()
 
-# 6. Chat loop
+
 if __name__ == "__main__":
     print("=" * 60)
     print("XanhSM AI Booking Agent")
