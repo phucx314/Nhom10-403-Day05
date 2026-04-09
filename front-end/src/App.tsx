@@ -390,6 +390,31 @@ export default function App() {
       // Tool response – có thể log, không cần show lên chat
       case 'tool_response': {
         console.log('[Tool Response]', msg.tool_name, msg.content);
+        if (msg.tool_name === 'book_ride' && msg.content) {
+          try {
+            const data = JSON.parse(msg.content);
+            if (data.status === 'success') {
+              let newTd = { ...tripDataRef.current };
+              newTd.pickup = data.origin;
+              newTd.destination = data.destination;
+              
+              const vType = data.vehicle_type?.toLowerCase() || '';
+              const matchedV = VEHICLES.find(v => 
+                vType.includes(v.type) || 
+                v.name.toLowerCase().includes(vType) || 
+                vType.includes(v.name.toLowerCase())
+              );
+              
+              if (matchedV) {
+                newTd.selectedVehicle = matchedV;
+              }
+              setTripData(newTd);
+              tripDataRef.current = newTd; // Cập nhật ref ngay lập tức để event sau dùng luôn
+            }
+          } catch (e) {
+            console.error('Error parsing book_ride response', e);
+          }
+        }
         break;
       }
 
@@ -402,20 +427,30 @@ export default function App() {
         setToolCalls([]); // clear tool badges khi có kết quả cuối
 
         // ── Parse nội dung để khám phá loại tin nhắn ──────────────────────
-        // Nếu agent đề xuất chọn xe → hiển thị vehicle-selection
-        const hasVehicleSelection = /chọn.*xe|loại xe|vehicle/i.test(text);
-        // Nếu agent xác nhận đặt thành công (book_ride trả về) → trip-summary
-        const hasBookSuccess = /đặt.*thành công|booking.*success/i.test(text);
+        // ── Parse nội dung để khám phá loại tin nhắn ──────────────────────
+        const hasVehicleSelection = /chọn.*xe|loại xe|xe loại|xe gì|xe nào|vehicle/i.test(text);
+        const hasBookSuccess = /đã lên đơn|đổi.*thành công|đặt.*thành công|booking.*success|màn hình đang hiển thị|xác nhận trên màn hình/i.test(text);
+
+        let newTd = { ...tripDataRef.current };
+
+        // CHỈ dùng Regex bóc tách chữ nếu chưa có data chuẩn từ Tool (tức là chưa book thành công)
+        if (!hasBookSuccess) {
+           const fromMatch = text.match(/từ\s+["']?([^"',\.]+?)["']?\s+đến/i);
+           const toMatch   = text.match(/đến\s+["']?([^"',\.]+?)(?:["']|[,\.])|bằng/i); // fix bắt lỗi đuôi "bằng xe"
+           
+           if (fromMatch) newTd.pickup = fromMatch[1].trim();
+           if (toMatch && toMatch[1]) newTd.destination = toMatch[1].trim();
+           
+           setTripData(newTd);
+        }
 
         if (hasBookSuccess) {
-          // Thử parse pickup/destination từ tripData hiện tại
-          const td = tripDataRef.current;
           addMessage({
             id: Date.now().toString(),
             role: 'assistant',
             content: text,
             type: 'trip-summary',
-            data: td,
+            data: newTd,
           });
         } else if (hasVehicleSelection) {
           addMessage({
@@ -431,18 +466,6 @@ export default function App() {
             content: text,
             type: 'text',
           });
-        }
-
-        // ── Cập nhật tripData nếu agent mention địa điểm ──────────────────
-        // Pattern: "từ X đến Y" hay "đón tại X" / "đến Y"
-        const fromMatch = text.match(/từ\s+["']?([^"',\.]+?)["']?\s+đến/i);
-        const toMatch   = text.match(/đến\s+["']?([^"',\.]+?)["']?[,\.]/i);
-        if (fromMatch || toMatch) {
-          setTripData(prev => ({
-            ...prev,
-            pickup:      fromMatch ? fromMatch[1].trim() : prev.pickup,
-            destination: toMatch   ? toMatch[1].trim()   : prev.destination,
-          }));
         }
 
         // Nếu WS vẫn recording → đặt lại idle
