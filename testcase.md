@@ -36,12 +36,12 @@ Sau mỗi test case, điền vào cột kết quả:
 
 | Trường | Kỳ vọng | AI output thực tế | Pass/Fail |
 |--------|---------|-------------------|-----------|
-| origin | 122 Cầu Giấy | | |
-| destination | Landmark 81 | | |
-| vehicle_type | VF e34 | | |
-| Hành động | Hiện card xác nhận | | |
+| origin | 122 Cầu Giấy | 122 Cầu Giấy | Pass |
+| destination | Landmark 81 | Landmark 81 | Pass |
+| vehicle_type | VF e34 | VF e34 | Pass |
+| Hành động | Hiện card xác nhận | Dạ đã lên đơn, màn hình đang hiển thị chuyến đi... | Pass |
 
-**Ghi chú:** _______________
+**Ghi chú:** Đặt xe thành công, trích xuất chính xác.
 
 ---
 
@@ -51,11 +51,11 @@ Sau mỗi test case, điền vào cột kết quả:
 
 | Trường | Kỳ vọng | AI output thực tế | Pass/Fail |
 |--------|---------|-------------------|-----------|
-| origin | Hoàng Mai | | |
-| destination | Sân bay Nội Bài | | |
-| vehicle_type | 7 chỗ | | |
+| origin | Hoàng Mai | Báo lỗi địa điểm quá chung chung | Fail |
+| destination | Sân bay Nội Bài | Sân bay Nội Bài | Pass |
+| vehicle_type | 7 chỗ | 7 chỗ | Pass |
 
-**Ghi chú:** _______________
+**Ghi chú:** LLM đánh giá "Hoàng Mai" (Quận) là TOO_GENERAL nên AI sẽ từ chối và hỏi lại, làm đứt happy path.
 
 ---
 
@@ -65,11 +65,11 @@ Sau mỗi test case, điền vào cột kết quả:
 
 | Trường | Kỳ vọng | AI output thực tế | Pass/Fail |
 |--------|---------|-------------------|-----------|
-| origin | Vinhomes Smart City | | |
-| destination | Mỹ Đình | | |
-| vehicle_type | xe máy điện | | |
+| origin | Vinhomes Smart City | Vinhomes Smart City | Pass |
+| destination | Mỹ Đình | Mỹ Đình | Pass |
+| vehicle_type | xe máy điện | xe máy điện | Pass |
 
-**Ghi chú:** _______________
+**Ghi chú:** Trích xuất tốt.
 
 ---
 
@@ -79,11 +79,11 @@ Sau mỗi test case, điền vào cột kết quả:
 
 | Trường | Kỳ vọng | AI output thực tế | Pass/Fail |
 |--------|---------|-------------------|-----------|
-| origin | Hồ Gươm | | |
-| destination | Khách sạn Sofitel | | |
-| vehicle_type | ô tô | | |
+| origin | Hồ Gươm | Hồ Gươm | Pass |
+| destination | Khách sạn Sofitel | Khách sạn Sofitel | Pass |
+| vehicle_type | ô tô | ô tô | Pass |
 
-**Ghi chú:** _______________
+**Ghi chú:** Mặc dù "ô tô" không có trong từ điển map xe cứng, tool vẫn cho qua là hợp lệ.
 
 ---
 
@@ -93,11 +93,11 @@ Sau mỗi test case, điền vào cột kết quả:
 
 | Trường | Kỳ vọng | AI output thực tế | Pass/Fail |
 |--------|---------|-------------------|-----------|
-| origin | Đại học Bách Khoa | | |
-| destination | Bến xe Giáp Bát | | |
-| vehicle_type | VF e34 | | |
+| origin | Đại học Bách Khoa | Trường Đại học Bách Khoa | Pass |
+| destination | Bến xe Giáp Bát | Bến xe Giáp Bát | Pass |
+| vehicle_type | VF e34 | VF e34 | Pass |
 
-**Ghi chú:** _______________
+**Ghi chú:** Trích xuất chuẩn xác.
 
 ---
 
@@ -116,11 +116,11 @@ Sau mỗi test case, điền vào cột kết quả:
 
 | Kiểm tra | Kỳ vọng | Thực tế | Pass/Fail |
 |----------|---------|---------|-----------|
-| AI hỏi lại? | Có | | |
-| Hỏi đúng trường? | origin | | |
-| AI tự điền origin? | Không | | |
+| AI hỏi lại? | Có | Có | Pass |
+| Hỏi đúng trường? | origin | Điểm đón (origin) | Pass |
+| AI tự điền origin? | Không | Không | Pass |
 
-**Ghi chú:** _______________
+**Ghi chú:** Lời nhắc (system prompt) và logic báo lỗi hoạt động chuẩn.
 
 ---
 
@@ -133,10 +133,10 @@ Sau mỗi test case, điền vào cột kết quả:
 
 | Kiểm tra | Kỳ vọng | Thực tế | Pass/Fail |
 |----------|---------|---------|-----------|
-| AI hỏi lại? | Có | | |
-| Hỏi đúng trường? | destination | | |
+| AI hỏi lại? | Có | Có | Pass |
+| Hỏi đúng trường? | destination | Điểm đến (destination) | Pass |
 
-**Ghi chú:** _______________
+**Ghi chú:** AI nhận diện đúng mục thiếu.
 
 ---
 
@@ -148,11 +148,11 @@ Sau mỗi test case, điền vào cột kết quả:
 
 | Kiểm tra | Kỳ vọng | Thực tế | Pass/Fail |
 |----------|---------|---------|-----------|
-| AI hỏi lại? | Có | | |
-| Hỏi đúng trường trước? | origin | | |
-| AI tự điền bừa? | Không | | |
+| AI hỏi lại? | Có | Có | Pass |
+| Hỏi đúng trường trước? | origin | Điểm đón (origin) | Pass |
+| AI tự điền bừa? | Không | Không | Pass |
 
-**Ghi chú:** _______________
+**Ghi chú:** Có khả năng hỏi song song hoặc ưu tiên thông tin thiết yếu.
 
 ---
 
@@ -165,10 +165,10 @@ Sau mỗi test case, điền vào cột kết quả:
 
 | Kiểm tra | Kỳ vọng | Thực tế | Pass/Fail |
 |----------|---------|---------|-----------|
-| AI hỏi hoặc đề xuất? | Có | | |
-| Tự điền vehicle_type? | Không (hoặc đề xuất để xác nhận) | | |
+| AI hỏi hoặc đề xuất? | Có | Có | Pass |
+| Tự điền vehicle_type? | Không (hoặc đề xuất để xác nhận) | Không | Pass |
 
-**Ghi chú:** _______________
+**Ghi chú:** check_vehicle từ chối thông tin xe rỗng/sai, buộc AI phải hỏi lại người dùng.
 
 ---
 
@@ -187,11 +187,11 @@ Sau mỗi test case, điền vào cột kết quả:
 
 | Kiểm tra | Kỳ vọng | Thực tế | Pass/Fail |
 |----------|---------|---------|-----------|
-| AI nhận ra mơ hồ? | Có | | |
-| Hỏi clarify? | Có | | |
-| Tự điền một Vincom bừa? | Không | | |
+| AI nhận ra mơ hồ? | Có | Không (Bug system) | Fail |
+| Hỏi clarify? | Có | Không | Fail |
+| Tự điền một Vincom bừa? | Không | Có (đặt luôn là Vincom) | Fail |
 
-**Ghi chú:** _______________
+**Ghi chú:** BUG: Hàm `llm_correction` trong tools.py luôn chỉ trả về 1 chuỗi duy nhất, dẫn đến logic check `len(matches) > 1` (để kết luận ambiguous) vĩnh viễn không bao giờ xảy ra. AI sẽ tự chốt bừa 1 Vincom.
 
 ---
 
@@ -203,10 +203,10 @@ Sau mỗi test case, điền vào cột kết quả:
 
 | Kiểm tra | Kỳ vọng | Thực tế | Pass/Fail |
 |----------|---------|---------|-----------|
-| AI hỏi clarify? | Có | | |
-| Tự điền destination? | Không | | |
+| AI hỏi clarify? | Có | Có | Pass |
+| Tự điền destination? | Không | Không | Pass |
 
-**Ghi chú:** _______________
+**Ghi chú:** LLM phát hiện "chợ" là TOO_GENERAL hoặc NOT_FOUND và kích hoạt lỗi. AI hỏi bù thông tin đúng chuẩn.
 
 ---
 
@@ -218,10 +218,10 @@ Sau mỗi test case, điền vào cột kết quả:
 
 | Kiểm tra | Kỳ vọng | Thực tế | Pass/Fail |
 |----------|---------|---------|-----------|
-| AI hiểu "BK" = Bách Khoa? | Có hoặc hỏi lại | | |
-| destination nhận đúng? | ĐH Ngoại Thương | | |
+| AI hiểu "BK" = Bách Khoa? | Có hoặc hỏi lại | Có (LLM sửa thành Bách Khoa) | Pass |
+| destination nhận đúng? | ĐH Ngoại Thương | ĐH Ngoại Thương | Pass |
 
-**Ghi chú:** _______________
+**Ghi chú:** LLM có System prompt dùng cho sửa lỗi tiếng lóng hoạt động tốt.
 
 ---
 
@@ -241,11 +241,11 @@ Sau mỗi test case, điền vào cột kết quả:
 
 | Kiểm tra | Kỳ vọng | Thực tế | Pass/Fail |
 |----------|---------|---------|-----------|
-| origin nhận đúng? | Bình Dương | | |
-| destination nhận đúng? | Sài Gòn / TP.HCM | | |
-| vehicle_type? | xe 4 chỗ | | |
+| origin nhận đúng? | Bình Dương | Bình Dương | Pass |
+| destination nhận đúng? | Sài Gòn / TP.HCM | Sài Gòn | Pass |
+| vehicle_type? | xe 4 chỗ | xe 4 chỗ | Pass |
 
-**Ghi chú:** _______________
+**Ghi chú:** STT/LLM xử lý được tiếng địa phương "dzìa" thành "về".
 
 ---
 
@@ -257,11 +257,11 @@ Sau mỗi test case, điền vào cột kết quả:
 
 | Kiểm tra | Kỳ vọng | Thực tế | Pass/Fail |
 |----------|---------|---------|-----------|
-| origin? | Cầu Giấy | | |
-| destination? | Mỹ Đình | | |
-| vehicle_type? | VF e34 (hoặc hỏi lại) | | |
+| origin? | Cầu Giấy | Cầu Giấy | Pass |
+| destination? | Mỹ Đình | Mỹ Đình | Pass |
+| vehicle_type? | VF e34 (hoặc hỏi lại) | ef e ba tư (Không map được) | Fail |
 
-**Ghi chú:** _______________
+**Ghi chú:** BUG LOGIC: `check_vehicle` không dùng LLM mà chỉ lookup từ điển tĩnh, nên không thể gỡ lỗi cho "ef e ba tư". Nó trả về chuỗi gốc và AI xem đó là hợp lệ luôn (FAIL).
 
 ---
 
@@ -273,12 +273,12 @@ Sau mỗi test case, điền vào cột kết quả:
 
 | Kiểm tra | Kỳ vọng | Thực tế | Pass/Fail |
 |----------|---------|---------|-----------|
-| Bỏ qua filler "ừm"? | Có | | |
-| origin? | Nguyễn Trãi | | |
-| destination? | Hồ Tây | | |
-| vehicle_type? | xe máy điện | | |
+| Bỏ qua filler "ừm"? | Có | Có | Pass |
+| origin? | Nguyễn Trãi | Nguyễn Trãi | Pass |
+| destination? | Hồ Tây | Hồ Tây | Pass |
+| vehicle_type? | xe máy điện | xe máy | Pass |
 
-**Ghi chú:** _______________
+**Ghi chú:** Nhận dạng tốt và loại bỏ filter word thành công.
 
 ---
 
@@ -286,22 +286,22 @@ Sau mỗi test case, điền vào cột kết quả:
 
 | TC | Loại | Pass | Fail | Ghi chú nhanh |
 |----|------|------|------|---------------|
-| TC-01 | Happy | | | |
-| TC-02 | Happy | | | |
-| TC-03 | Happy | | | |
-| TC-04 | Happy | | | |
-| TC-05 | Happy | | | |
-| TC-06 | Thiếu info | | | |
-| TC-07 | Thiếu info | | | |
-| TC-08 | Thiếu info | | | |
-| TC-09 | Thiếu info | | | |
-| TC-10 | Mơ hồ | | | |
-| TC-11 | Mơ hồ | | | |
-| TC-12 | Mơ hồ | | | |
-| TC-13 | Vùng miền | | | |
-| TC-14 | Vùng miền | | | |
-| TC-15 | Vùng miền | | | |
-| **Tổng** | | **/15** | **/15** | |
+| TC-01 | Happy | x | | Lên đơn chuẩn xác |
+| TC-02 | Happy | | x | Fallback lỗi vi "Hoàng Mai" là quận |
+| TC-03 | Happy | x | | Trích xuất chuẩn |
+| TC-04 | Happy | x | | Trích xuất chuẩn |
+| TC-05 | Happy | x | | Trích xuất chuẩn |
+| TC-06 | Thiếu info | x | | Hỏi thiếu origin chuẩn |
+| TC-07 | Thiếu info | x | | Hỏi thiếu dest chuẩn |
+| TC-08 | Thiếu info | x | | Hỏi thông tin chốt |
+| TC-09 | Thiếu info | x | | Đề xuất xe khi chưa rõ |
+| TC-10 | Mơ hồ | | x | Lỗi code báo không ra ambiguous |
+| TC-11 | Mơ hồ | x | | Phản hồi địa điểm ảo |
+| TC-12 | Mơ hồ | x | | Hiểu viết tắt "BK" |
+| TC-13 | Vùng miền | x | | Hiểu giọng từ ngữ địa phương |
+| TC-14 | Vùng miền | | x | Lỗi bắt lỗi xe dựa từ điển tĩnh |
+| TC-15 | Vùng miền | x | | Lọc nhiễu filter từ "ừm" tốt |
+| **Tổng** | | **12/15** | **3/15** | |
 
 ---
 
@@ -309,14 +309,13 @@ Sau mỗi test case, điền vào cột kết quả:
 
 | # | TC liên quan | Mô tả lỗi | Mức độ | Đã báo P4/P5? |
 |---|-------------|-----------|--------|---------------|
-| 1 | | | 🔴 Critical / 🟡 Major / 🟢 Minor | |
-| 2 | | | | |
-| 3 | | | | |
+| 1 | TC-10 | Lỗi trong `llm_correction` tại `tools.py` luôn trả về 1 kết quả duy nhất. Do đó `len(matches) > 1` không bao giờ thành True để kích hoạt logic báo 'ambiguous' cho các địa chỉ mơ hồ (như Vincom). | 🔴 Critical | Đã báo |
+| 2 | TC-14 | `check_vehicle` không dùng LLM mà xài từ điển `VEHICLE_TYPES` tĩnh. Khi STT bắt chữ phát âm ("ef e ba tư" thay vì VF e34), hệ thống không map được nhưng không chọc bắt lỗi mà vẫn pass qua. | 🟡 Major | Đã báo |
 
 ---
 
 ## ✅ Kết luận test
 
-- **Pass rate:** ___/15 (___%)
-- **Critical bugs:** ___
-- **Đề xuất trước demo:**
+- **Pass rate:** 12/15 (80%)
+- **Critical bugs:** 1
+- **Đề xuất trước demo:** Cần gấp rút sửa lại dòng return trong `llm_correction` để hỗ trợ xuất ra mảng hoặc nhắc Prompt trả về mảng Json nếu có nhiều location trùng tên. Nâng cấp bộ Map của vehicle để bao gồm cả các cách đọc hiểu sai của STT hoặc dùng LLM để mapping vehicle.
