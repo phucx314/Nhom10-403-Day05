@@ -318,7 +318,14 @@ export default function App() {
               try {
                   const args = typeof data.args === 'string' ? JSON.parse(data.args) : data.args;
                   const vType = args.vehicle_type || 'taxi';
-                  const selectedV = VEHICLES.find(v => v.type.toLowerCase().includes(vType.toLowerCase())) || VEHICLES[0];
+                  
+                  let vTypeKey = 'taxi';
+                  const lowerVType = vType.toLowerCase();
+                  if (lowerVType.includes('vf8') || lowerVType.includes('vf9') || lowerVType.includes('sang trọng')) vTypeKey = 'luxury';
+                  if (lowerVType.includes('bike') || lowerVType.includes('máy')) vTypeKey = 'bike';
+                  
+                  const baseVehicle = VEHICLES.find(v => v.type === vTypeKey) || VEHICLES[0];
+                  const selectedV = { ...baseVehicle, name: vType, type: vType };
                   
                   // Đọc 'origin' thay vì 'pickup' theo đúng định nghĩa tool của Python!
                   const pickupLoc = args.origin || args.pickup || 'Vị trí hiện tại';

@@ -39,10 +39,14 @@ def llm_correction(loc: str):
 Nhiệm vụ: Người dùng sẽ đọc tên địa điểm ở Việt Nam bằng tiếng nói. Do lỗi Speech-to-Text, tên có thể bị sai chính tả hoặc sai lệch ngữ âm.
 Hãy đánh giá tính hợp lệ của cụm từ và trả về kết quả chuẩn nhất có thể.
 
+LƯU Ý QUAN TRỌNG: 
+- Khu vực hoạt động mặc định của ứng dụng hiện tại là HÀ NỘI. 
+- Hãy ưu tiên suy luận các địa danh, tên đường, khu đô thị thuộc phạm vi Hà Nội (Ví dụ: Ocean Park, Landmark 72, Cổ Linh, Mỹ Đình...).
+
 Quy tắc xử lý:
 1. Nếu địa danh người dùng cung cấp quá chung chung (chỉ ghi mỗi Tên Tỉnh, Tên Thành phố hoặc Tên Quận/Huyện, ví dụ: 'Thái Bình', 'Hà Nội', 'Quận 1', 'Nghệ An'), hãy trả về CHUỖI CỨNG: TOO_GENERAL
 2. Nếu từ cụm đó hoàn toàn vô nghĩa và chắc chắn không phải là một địa điểm/địa chỉ, hãy trả về CHUỖI CỨNG: NOT_FOUND
-3. Nếu đó là một cụm địa chỉ hoặc địa điểm có khả năng là thật (ví dụ: 'len mắc' -> 'Landmark 81', 'học viện bương chính viên thông' -> 'Học viện Công nghệ Bưu chính Viễn thông', 'bến xe mỹ đìn' -> 'Bến xe Mỹ Đình'), hãy trả về đúng TÊN ĐÃ ĐƯỢC CHUẨN HOÁ CHÍNH TẢ.
+3. Nếu đó là một cụm địa chỉ hoặc địa điểm có khả năng là thật (ví dụ: 'len mắc' -> 'Landmark 72', 'học viện bương chính viên thông' -> 'Học viện Công nghệ Bưu chính Viễn thông', 'bến xe mỹ đìn' -> 'Bến xe Mỹ Đình'), hãy trả về đúng TÊN ĐÃ ĐƯỢC CHUẨN HOÁ CHÍNH TẢ.
 
 CHỈ TRẢ VỀ ĐÚNG 1 KẾT QUẢ, KHÔNG GIẢI THÍCH THÊM."""
 
