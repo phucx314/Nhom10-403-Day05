@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, ReactNode } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import RecordRTC, { StereoAudioRecorder } from 'recordrtc';
 
@@ -63,13 +63,13 @@ const VEHICLES: Vehicle[] = [
 
 // --- Components ---
 
-const Header = ({ title, onMenuClick }: { title: string; onMenuClick?: () => void }) => (
+const Header = ({ title, onMenuClick }: { title: ReactNode; onMenuClick?: () => void }) => (
   <header className="fixed top-0 w-full z-50 glass-header flex justify-between items-center px-6 h-20">
     <div className="flex items-center gap-4">
       <button onClick={onMenuClick} className="p-2 rounded-full hover:bg-black/5 transition-colors">
         <Menu className="w-6 h-6 text-primary" />
       </button>
-      <h1 className="font-extrabold text-2xl tracking-tight text-primary uppercase">{title}</h1>
+      <h1 className="font-extrabold text-2xl tracking-tight text-primary">{title}</h1>
     </div>
     <div className="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center overflow-hidden border-2 border-primary-container">
       <img
@@ -491,7 +491,9 @@ export default function App() {
 
   return (
     <div className="h-[100dvh] bg-surface overflow-hidden flex flex-col">
-      <Header title={currentScreen === 'home' ? 'RideFlow' : 'AI Booking'} />
+      <Header title={currentScreen === 'home' ? (
+        <span className="uppercase">XanhSM <span style={{ color: '#ecd028' }}>Pro Max</span></span>
+      ) : 'XanhCompanion'} />
 
       <main className="flex-1 relative overflow-hidden flex flex-col">
         <AnimatePresence mode="wait">
@@ -504,12 +506,12 @@ export default function App() {
               className="pt-24 pb-32 px-6 max-w-md mx-auto w-full overflow-y-auto"
             >
               <section className="mb-8">
-                <h2 className="text-3xl font-black tracking-tight text-on-surface">Hello, Tạ Vĩnh Phúc</h2>
+                <h2 className="text-3xl font-black tracking-tight text-on-surface">Hello, Phùng Thanh Độ</h2>
                 <p className="text-on-surface-variant font-medium mt-1">Where can we take you today?</p>
               </section>
 
               <section className="flex items-center gap-3 mb-10">
-                <div onClick={startBooking} className="flex-grow bg-surface-container-highest rounded-2xl h-16 flex items-center px-5 gap-3 shadow-inner cursor-pointer hover:bg-surface-container-high transition-colors">
+                <div onClick={startBooking} className="flex-grow bg-white/80 backdrop-blur-lg rounded-2xl h-16 flex items-center px-5 gap-3 border border-outline-variant/50 shadow-[0_8px_30px_rgb(0,0,0,0.04)] cursor-pointer hover:bg-white hover:border-primary/30 hover:shadow-[0_8px_30px_rgba(49,200,207,0.1)] transition-all">
                   <Search className="w-6 h-6 text-outline" />
                   <span className="text-on-surface-variant font-medium text-lg">Where to?</span>
                 </div>
