@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+websockets
+python-dotenv
+openai
+langchain-openai
+langchain-core
+langgraph

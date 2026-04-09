@@ -23,112 +23,113 @@ async def websocket_endpoint(client_ws: WebSocket):
     
     # Store chat history per session to maintain context if agent asks clarification questions
     chat_history = []
+    print("Mới kết nối WebSocket Frontend")
 
-    async with websockets.connect(
-        OPENAI_URL,
-        additional_headers={
-            "Authorization": f"Bearer {API_KEY}",
-            "OpenAI-Beta": "realtime=v1"
-        }
-    ) as openai_ws:
+    WIT_TOKEN = os.getenv("WIT_AI_TOKEN")
 
-        print("OpenAI WebSocket connected successfully!")
-
-        # init session
-        await openai_ws.send(json.dumps({
-            "type": "session.update",
-            "session": {
-                "modalities": ["text"],
-                "instructions": "Bạn là một hệ thống chuyển đổi giọng nói thành văn bản. Nhiệm vụ duy nhất của bạn là ghi lại những gì người dùng nói. TUYỆT ĐỐI KHÔNG được trả lời, không tư vấn, không giải thích thêm. Chỉ im lặng.",
-                "input_audio_format": "pcm16",
-                "input_audio_transcription": {
-                    "model": "gpt-4o-transcribe",
-                    "language": "vi"
-                },
-                "turn_detection": None
-            }
-        }))
-
-        async def client_to_openai():
+    try:
+        while True:
+            data_str = await client_ws.receive_text()
             try:
-                while True:
-                    data = await client_ws.receive_text()
-                    await openai_ws.send(data)
-            except Exception as e:
-                print(f"Error reading from client: {e}")
-
-        async def openai_to_client():
-            nonlocal chat_history
-            try:
-                async for message in openai_ws:
-                    print(f"From OpenAI: {message}")
-                    await client_ws.send_text(message)
-                    
-                    try:
-                        msg_data = json.loads(message)
-                        # Intercept STT response completed
-                        if msg_data.get("type") == "conversation.item.input_audio_transcription.completed":
-                            transcript = msg_data.get("transcript", "").strip()
-                            if transcript:
-                                print(f"-> Trích xuất giọng nói (STT): {transcript}")
-                                
-                                # 1. Append user's transcript to history
-                                chat_history.append(("human", transcript))
-                                
-                                # 2. Run graph calculation asynchronously so it doesn't block WS
-                                print("-> Agent đang xử lý...")
-                                result = await asyncio.to_thread(graph.invoke, {"messages": chat_history})
-                                
-                                # Extract new messages to send to FE
-                                new_messages = result["messages"][len(chat_history):]
-                                
-                                for msg in new_messages:
-                                    if msg.type == "tool":
-                                        print(f"-> Gửi Tool Response ({msg.name}) về FE: {msg.content}")
-                                        await client_ws.send_text(json.dumps({
-                                            "type": "tool_response",
-                                            "tool_name": msg.name,
-                                            "content": msg.content
-                                        }, ensure_ascii=False))
-                                    elif msg.type == "ai":
-                                        if hasattr(msg, "tool_calls") and getattr(msg, "tool_calls"):
-                                            for tc in msg.tool_calls:
-                                                print(f"-> Gọi tool: {tc['name']}({tc['args']})")
-                                                await client_ws.send_text(json.dumps({
-                                                    "type": "tool_call",
-                                                    "tool_name": tc['name'],
-                                                    "args": tc['args']
-                                                }, ensure_ascii=False))
-                                        
-                                        if msg.content:
-                                            print(f"-> Agent Response: {msg.content}")
-                                            await client_ws.send_text(json.dumps({
-                                                "type": "agent_response",
-                                                "text": msg.content
-                                            }, ensure_ascii=False))
-                                            
-                                            # Synthesize Speech (TTS) using OpenAI API
-                                            # try:
-                                            #     tts_response = await openai_client.audio.speech.create(
-                                            #         model="tts-1",
-                                            #         voice="nova",
-                                            #         input=msg.content
-                                            #     )
-                                            #     audio_base64 = base64.b64encode(tts_response.content).decode('utf-8')
-                                                
-                                            #     await client_ws.send_text(json.dumps({
-                                            #         "type": "audio_playback",
-                                            #         "audio_base64": audio_base64
-                                            #     }, ensure_ascii=False))
-                                            # except Exception as e:
-                                            #     print(f"Lỗi khi gọi TTS: {e}")
-                                
-                                # 3. Cập nhật lại toàn bộ history bao gồm các lệnh gọi tool
-                                chat_history = list(result["messages"])
-                    except json.JSONDecodeError:
-                        pass
+                msg_data = json.loads(data_str)
+            except json.JSONDecodeError:
+                continue
+                
+            if msg_data.get("type") == "audio":
+                # Nhận audio dạng chuỗi base64 từ frontend
+                audio_b64 = msg_data.get("data", "")
+                if not audio_b64:
+                    continue
+                
+                print("-> Đã nhận Audio từ Frontend, đang gửi lên Wit.ai để phân tích...")
+                
+                try:
+                    # Tách phần metadata data:audio/webm;base64, nếu có
+                    if "," in audio_b64:
+                        audio_b64 = audio_b64.split(",")[1]
                         
-            except Exception as e:
-                print(f"Error reading from OpenAI: {e}")
+                    audio_bytes = base64.b64decode(audio_b64)
+                    
+                    import httpx
+                    import re
+                    
+                    # Gọi endpoint speech của Wit.ai giống file HTML của bạn
+                    headers = {
+                        "Authorization": f"Bearer {WIT_TOKEN}",
+                        "Content-Type": "audio/wav",
+                    }
+                    
+                    # Sử dụng httpx để request không block (hoặc asyncio.to_thread với requests)
+                    async with httpx.AsyncClient() as client:
+                        resp = await client.post(
+                            "https://api.wit.ai/speech?v=20260409",
+                            headers=headers,
+                            content=audio_bytes,
+                            timeout=30.0
+                        )
+                        
+                        # Hackathon Trick: Moi cái chữ cuối cùng ra giống hệt mã JS của bạn
+                        raw_text = resp.text
+                        matches = re.findall(r'"text"\s*:\s*"([^"]+)"', raw_text)
+                        
+                        transcript = matches[-1] if matches else ""
+                        transcript = transcript.strip()
+                        
+                        if transcript:
+                            print(f"-> Trích xuất giọng nói (Wit.ai): {transcript}")
+                            
+                            # 1. Append user's transcript to history
+                            chat_history.append(("human", transcript))
+                            
+                            # Gửi tin nhắn text của user lại cho Frontend để nó render lên UI luôn
+                            await client_ws.send_text(json.dumps({
+                                "type": "user_message",
+                                "text": transcript
+                            }))
+                            
+                            # 2. Run graph calculation asynchronously
+                            print("-> Agent đang xử lý...")
+                            result = await asyncio.to_thread(graph.invoke, {"messages": chat_history})
+                            
+                            # Extract new messages to send to FE
+                            new_messages = result["messages"][len(chat_history):]
+                            
+                            for msg in new_messages:
+                                if msg.type == "tool":
+                                    print(f"-> Gửi Tool Response ({msg.name}) về FE: {msg.content}")
+                                    await client_ws.send_text(json.dumps({
+                                        "type": "tool_response",
+                                        "tool_name": msg.name,
+                                        "content": msg.content
+                                    }, ensure_ascii=False))
+                                elif msg.type == "ai":
+                                    if hasattr(msg, "tool_calls") and getattr(msg, "tool_calls"):
+                                        for tc in msg.tool_calls:
+                                            print(f"-> Gọi tool: {tc['name']}({tc['args']})")
+                                            await client_ws.send_text(json.dumps({
+                                                "type": "tool_call",
+                                                "tool_name": tc['name'],
+                                                "args": tc['args']
+                                            }, ensure_ascii=False))
+                                    
+                                    if msg.content:
+                                        print(f"-> Agent Response: {msg.content}")
+                                        await client_ws.send_text(json.dumps({
+                                            "type": "agent_response",
+                                            "text": msg.content
+                                        }, ensure_ascii=False))
+                            
+                            # 3. Cập nhật lại toàn bộ history bao gồm các lệnh gọi tool
+                            chat_history = list(result["messages"])
+                        else:
+                            print("-> Lỗi/Không nhận diện được giọng nói.")
+                except Exception as e:
+                    print(f"Lỗi phần xử lý Audio/Agent: {e}")
+            elif msg_data.get("type") == "text":
+                # (Tương lai có thể hỗ trợ Frontend gửi text chat trực tiếp)
+                pass
 
-        await asyncio.gather(client_to_openai(), openai_to_client())
+    except websockets.exceptions.ConnectionClosed:
+        print("Frontend ngắt kết nối WebSocket.")
+    except Exception as e:
+        print(f"Lỗi kết nối WS: {e}")

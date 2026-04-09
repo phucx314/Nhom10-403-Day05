@@ -5,6 +5,8 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import RecordRTC, { StereoAudioRecorder } from 'recordrtc';
+
 import { 
   Car, 
   Plane, 
@@ -102,7 +104,7 @@ const BottomNav = ({ activeTab }: { activeTab: string }) => (
   </nav>
 );
 
-const VoiceInteractionBar = ({ onCancel, onVoice, isProcessing }: { onCancel: () => void; onVoice?: () => void; isProcessing?: boolean }) => (
+const VoiceInteractionBar = ({ onCancel, onVoiceStart, onVoiceEnd, isRecording, isProcessing }: { onCancel: () => void; onVoiceStart?: () => void; onVoiceEnd?: () => void; isRecording?: boolean; isProcessing?: boolean }) => (
   <div className="w-full flex flex-col items-center relative z-50">
     <div className="w-full bg-white/90 backdrop-blur-2xl rounded-t-[3.5rem] shadow-[0_-8px_32px_rgba(0,0,0,0.1)] pt-10 pb-12 px-6">
       <div className="max-w-md mx-auto flex items-center justify-between gap-6">
@@ -117,18 +119,23 @@ const VoiceInteractionBar = ({ onCancel, onVoice, isProcessing }: { onCancel: ()
         </div>
 
         <div className="flex flex-col items-center gap-4">
-          <div className="relative">
+          <div className="relative pointer-events-auto">
             <motion.div 
-              animate={{ scale: isProcessing ? [1, 1.2, 1] : 1 }}
+              animate={{ scale: isRecording ? [1, 1.3, 1] : isProcessing ? [1, 1.2, 1] : 1 }}
               transition={{ repeat: Infinity, duration: 1 }}
-              className={`absolute inset-0 rounded-full ${isProcessing ? 'bg-primary/20' : ''}`}
+              className={`absolute inset-0 rounded-full ${isRecording ? 'bg-red-500/20' : isProcessing ? 'bg-primary/20' : ''}`}
             />
-            <button onClick={onVoice} className={`relative z-10 w-28 h-28 rounded-full bg-gradient-to-br from-primary to-primary-container text-white shadow-xl flex items-center justify-center active:scale-95 transition-transform ${isProcessing ? 'animate-pulse' : ''}`}>
+            <button 
+              onPointerDown={onVoiceStart}
+              onPointerUp={onVoiceEnd}
+              onPointerLeave={onVoiceEnd}
+              className={`relative z-10 w-28 h-28 rounded-full bg-gradient-to-br from-primary to-primary-container text-white shadow-xl flex items-center justify-center transition-all ${isRecording ? 'scale-90 !bg-red-500 opacity-90' : 'active:scale-95'} ${isProcessing ? 'animate-pulse' : ''}`}
+            >
               <Mic className="w-12 h-12" />
             </button>
           </div>
-          <span className="text-primary font-black text-sm tracking-[0.2em] uppercase">
-            {isProcessing ? 'Processing...' : 'Hold to Speak'}
+          <span className={`font-black text-sm tracking-[0.2em] uppercase ${isRecording ? 'text-red-500 animate-pulse' : 'text-primary'}`}>
+            {isRecording ? 'Recording...' : isProcessing ? 'Processing...' : 'Hold to Speak'}
           </span>
         </div>
 
@@ -256,13 +263,82 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
   const [messages, setMessages] = useState<Message[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
   const [tripData, setTripData] = useState<TripData>({ pickup: '', destination: '' });
   const [isTyping, setIsTyping] = useState(false);
+  
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const isNearBottomRef = useRef(true);
   const isAutoScrolling = useRef(false);
   const autoScrollTimeout = useRef<any>(null);
+
+  const wsRef = useRef<WebSocket | null>(null);
+  const mediaRecorderRef = useRef<any>(null);
+
+  // Setup WebSocket connection
+  useEffect(() => {
+    wsRef.current = new WebSocket('ws://127.0.0.1:8000/ws');
+    
+    wsRef.current.onopen = () => {
+      console.log('Connected to backend WebSocket');
+    };
+
+    wsRef.current.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'user_message') {
+           addMessage({ id: Date.now().toString(), role: 'user', content: data.text });
+           setIsProcessing(false);
+           setIsTyping(true);
+        } else if (data.type === 'agent_response') {
+           setIsTyping(false);
+           addMessage({ id: Date.now().toString(), role: 'assistant', content: data.text });
+        } else if (data.type === 'tool_call') {
+           setIsTyping(true);
+           if (data.tool_name === 'check_vehicle' || data.tool_name === 'get_vehicle_info') {
+              setIsTyping(false);
+              addMessage({
+                id: Date.now().toString(),
+                role: 'assistant',
+                content: "Vui lòng chọn loại xe:",
+                type: 'vehicle-selection'
+              });
+           } else if (data.tool_name === 'book_ride') {
+              setIsTyping(false);
+              try {
+                  const args = typeof data.args === 'string' ? JSON.parse(data.args) : data.args;
+                  const vType = args.vehicle_type || 'taxi';
+                  const selectedV = VEHICLES.find(v => v.type.toLowerCase().includes(vType.toLowerCase())) || VEHICLES[0];
+                  
+                  const activeTrip = { pickup: args.pickup, destination: args.destination, selectedVehicle: selectedV };
+                  setTripData(activeTrip);
+
+                  addMessage({
+                    id: Date.now().toString(),
+                    role: 'assistant',
+                    content: "Dưới đây là tóm tắt chuyến đi của bạn:",
+                    type: 'trip-summary',
+                    data: activeTrip
+                  });
+              } catch (e) {}
+           }
+        } else if (data.type === 'tool_response') {
+           // Có thể bỏ qua hiển thị text của tool response
+        }
+      } catch(e) {
+        console.error('Error parsing WS message:', e);
+      }
+    };
+
+    wsRef.current.onclose = () => {
+      console.log('Backend WebSocket closed');
+    };
+
+    return () => {
+      wsRef.current?.close();
+    };
+  }, []);
 
   const handleScroll = () => {
     if (isAutoScrolling.current) return;
@@ -293,41 +369,14 @@ export default function App() {
   const startBooking = () => {
     setCurrentScreen('chat');
     setIsTyping(true);
-    
     setTimeout(() => {
       setIsTyping(false);
       addMessage({
         id: '1',
         role: 'assistant',
-        content: 'Where should I pick you up?',
+        content: 'Xin chào! Tôi có thể giúp gì cho chuyến đi của bạn?',
         type: 'text'
       });
-      
-      // Simulate user voice input after a delay
-      setTimeout(() => {
-        setIsProcessing(true);
-        setTimeout(() => {
-          setIsProcessing(false);
-          addMessage({
-            id: '2',
-            role: 'user',
-            content: 'đến đón tôi ở Toà S1.01 Vinhomes Ocean Park đi ngõ 120 Yên Lãng đê'
-          });
-          
-          setIsTyping(true);
-          setTimeout(() => {
-            setIsTyping(false);
-            const updatedTrip = { pickup: 'Toà S1.01 Vinhomes Ocean Park', destination: 'ngõ 120 Yên Lãng' };
-            setTripData(updatedTrip);
-            addMessage({
-              id: '3',
-              role: 'assistant',
-              content: "I've set your trip from Toà S1.01 Vinhomes Ocean Park to ngõ 120 Yên Lãng. Please choose your vehicle.",
-              type: 'vehicle-selection'
-            });
-          }, 1500);
-        }, 2000);
-      }, 1000);
     }, 1000);
   };
 
@@ -335,22 +384,15 @@ export default function App() {
     addMessage({
       id: Date.now().toString(),
       role: 'user',
-      content: `đã chọn ${v.name}`
+      content: `Tao chọn xe ${v.name}`
     });
+
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+       wsRef.current.send(JSON.stringify({ type: 'text', data: `Tôi chọn xe ${v.name}` }));
+    }
     
-    setIsTyping(true);
-    setTimeout(() => {
-      setIsTyping(false);
-      const updatedTrip = { ...tripData, selectedVehicle: v };
-      setTripData(updatedTrip);
-      addMessage({
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: "I've confirmed your selection. Here is your trip summary. Please confirm to proceed.",
-        type: 'trip-summary',
-        data: updatedTrip
-      });
-    }, 1200);
+    // Disable in UI
+    setMessages(prev => prev.map(m => m.type === 'vehicle-selection' ? { ...m, disabled: true } : m));
   };
 
   const handleAction = (action: any) => {
@@ -367,37 +409,51 @@ export default function App() {
     setTripData({ pickup: '', destination: '' });
   };
 
-  const handleVoiceClick = () => {
-    if (messages.length === 0) return;
-    const lastMessage = messages[messages.length - 1];
-    
-    if (lastMessage.type === 'trip-summary') {
-      setIsProcessing(true);
-      setTimeout(() => {
-        setIsProcessing(false);
-        addMessage({
-          id: Date.now().toString(),
-          role: 'user',
-          content: 'tôi đang ở cổng phụ VinUni chứ không phải toà S1.01, à và tôi muốn đi bike'
-        });
+  const handleVoiceStart = async () => {
+    if (isRecording) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recordRTC = new RecordRTC(stream, {
+          type: 'audio',
+          mimeType: 'audio/wav',
+          recorderType: StereoAudioRecorder,
+          desiredSampRate: 16000 
+      });
+      mediaRecorderRef.current = recordRTC;
+
+      recordRTC.startRecording();
+      setIsRecording(true);
+    } catch (err) {
+      console.error("Microphone access denied or error:", err);
+    }
+  };
+
+  const handleVoiceEnd = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.getState() === 'recording') {
+      mediaRecorderRef.current.stopRecording(() => {
+        setIsRecording(false);
+        setIsProcessing(true); // Hiển thị xử lý sau khi nhả nút
         
-        setIsTyping(true);
+        // Auto-disable interaction messages up to this point
         setMessages(prev => prev.map(m => (m.type === 'trip-summary' || m.type === 'vehicle-selection' ? { ...m, disabled: true } : m)));
         
-        setTimeout(() => {
-          setIsTyping(false);
-          const bikeVehicle = VEHICLES.find(v => v.type === 'bike')!;
-          const updatedTrip = { pickup: 'cổng phụ VinUni', destination: tripData.destination, selectedVehicle: bikeVehicle };
-          setTripData(updatedTrip);
-          addMessage({
-            id: (Date.now() + 1).toString(),
-            role: 'assistant',
-            content: "Đã cập nhật thông tin chuyến đi: đón tại cổng phụ VinUni và chọn Xanh SM Bike. Dưới đây là tóm tắt mới, vui lòng xác nhận.",
-            type: 'trip-summary',
-            data: updatedTrip
-          });
-        }, 1500);
-      }, 1500);
+        const audioBlob = mediaRecorderRef.current.getBlob(); 
+        const reader = new FileReader();
+        reader.readAsDataURL(audioBlob);
+        reader.onloadend = () => {
+           const base64Audio = reader.result as string;
+           if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+              wsRef.current.send(JSON.stringify({ type: 'audio', data: base64Audio }));
+           }
+        };
+        
+        // Dọn dẹp stream (bắt buộc để ngắt dấu chấm đỏ trên tab)
+        const stream = mediaRecorderRef.current.stream;
+        if (stream) stream.getTracks().forEach((track: any) => track.stop());
+        
+        mediaRecorderRef.current.destroy();
+        mediaRecorderRef.current = null;
+      });
     }
   };
 
@@ -542,7 +598,7 @@ export default function App() {
               
               <div className="shrink-0 w-full relative z-20 mt-auto pointer-events-none">
                 <div className="pointer-events-auto">
-                  <VoiceInteractionBar onCancel={handleCancel} onVoice={handleVoiceClick} isProcessing={isProcessing} />
+                  <VoiceInteractionBar onCancel={handleCancel} onVoiceStart={handleVoiceStart} onVoiceEnd={handleVoiceEnd} isRecording={isRecording} isProcessing={isProcessing} />
                 </div>
               </div>
             </motion.div>
