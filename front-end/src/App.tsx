@@ -278,6 +278,7 @@ export default function App() {
   const [isRecording, setIsRecording] = useState(false);
   const [tripData, setTripData] = useState<TripData>({ pickup: '', destination: '' });
   const [isTyping, setIsTyping] = useState(false);
+  const [rating, setRating] = useState(0);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -414,12 +415,6 @@ export default function App() {
   };
 
   const handleVehicleSelect = (v: Vehicle) => {
-    addMessage({
-      id: Date.now().toString() + Math.random().toString(),
-      role: 'user',
-      content: `Tôi chọn xe ${v.name}`
-    });
-
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: 'text', data: `Tôi chọn xe ${v.name}` }));
     }
@@ -506,7 +501,7 @@ export default function App() {
               className="pt-24 pb-32 px-6 max-w-md mx-auto w-full overflow-y-auto"
             >
               <section className="mb-8">
-                <h2 className="text-3xl font-black tracking-tight text-on-surface">Hello, Phùng Thanh Độ</h2>
+                <h2 className="text-3xl font-black tracking-tight text-on-surface">Hello, Nà ná na na 🖥️⌨️</h2>
                 <p className="text-on-surface-variant font-medium mt-1">Where can we take you today?</p>
               </section>
 
@@ -673,6 +668,30 @@ export default function App() {
                 </div>
                 <h2 className="mt-12 text-3xl font-black text-primary tracking-tight uppercase text-center">Finding your driver...</h2>
                 <p className="mt-4 text-outline font-bold text-sm tracking-widest uppercase">Connecting to nearby vehicles</p>
+
+                <div className="mt-12 bg-white/60 backdrop-blur-xl p-8 rounded-[2.5rem] border border-white/40 shadow-xl flex flex-col items-center gap-4 w-full max-w-sm">
+                  <p className="text-on-surface font-black text-sm tracking-widest uppercase">Rate XanhCompanion</p>
+                  <div className="flex gap-2">
+                    {[1, 2, 3, 4, 5].map((s) => (
+                      <button
+                        key={s}
+                        onClick={() => setRating(s)}
+                        className={`transition-all duration-300 ${s <= rating ? 'text-primary scale-110 drop-shadow-[0_0_8px_rgba(49,200,207,0.5)]' : 'text-outline-variant hover:text-primary/50'}`}
+                      >
+                        <Star className={`w-8 h-8 ${s <= rating ? 'fill-current' : ''}`} />
+                      </button>
+                    ))}
+                  </div>
+                  {rating > 0 && (
+                    <motion.p
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="text-primary font-bold text-xs"
+                    >
+                      Cảm ơn bạn đã đánh giá {rating} sao!
+                    </motion.p>
+                  )}
+                </div>
               </div>
 
               <div className="fixed bottom-12 w-full px-6 flex flex-col items-center">
