@@ -27,6 +27,42 @@ async def websocket_endpoint(client_ws: WebSocket):
 
     WIT_TOKEN = os.getenv("WIT_AI_TOKEN")
 
+    async def run_agent_and_respond(user_text: str):
+        nonlocal chat_history
+        chat_history.append(("human", user_text))
+        
+        print("-> Agent đang xử lý...")
+        result = await asyncio.to_thread(graph.invoke, {"messages": chat_history})
+        
+        new_messages = result["messages"][len(chat_history):]
+        
+        for msg in new_messages:
+            if msg.type == "tool":
+                print(f"-> Gửi Tool Response ({msg.name}) về FE: {msg.content}")
+                await client_ws.send_text(json.dumps({
+                    "type": "tool_response",
+                    "tool_name": msg.name,
+                    "content": msg.content
+                }, ensure_ascii=False))
+            elif msg.type == "ai":
+                if hasattr(msg, "tool_calls") and getattr(msg, "tool_calls"):
+                    for tc in msg.tool_calls:
+                        print(f"-> Gọi tool: {tc['name']}({tc['args']})")
+                        await client_ws.send_text(json.dumps({
+                            "type": "tool_call",
+                            "tool_name": tc['name'],
+                            "args": tc['args']
+                        }, ensure_ascii=False))
+                
+                if msg.content:
+                    print(f"-> Agent Response: {msg.content}")
+                    await client_ws.send_text(json.dumps({
+                        "type": "agent_response",
+                        "text": msg.content
+                    }, ensure_ascii=False))
+        
+        chat_history = list(result["messages"])
+
     try:
         while True:
             data_str = await client_ws.receive_text()
@@ -78,49 +114,14 @@ async def websocket_endpoint(client_ws: WebSocket):
                         if transcript:
                             print(f"-> Trích xuất giọng nói (Wit.ai): {transcript}")
                             
-                            # 1. Append user's transcript to history
-                            chat_history.append(("human", transcript))
-                            
-                            # Gửi tin nhắn text của user lại cho Frontend để nó render lên UI luôn
+                            # 1. Gửi tin nhắn text của user lại cho Frontend để nó render lên UI luôn
                             await client_ws.send_text(json.dumps({
                                 "type": "user_message",
                                 "text": transcript
                             }))
                             
-                            # 2. Run graph calculation asynchronously
-                            print("-> Agent đang xử lý...")
-                            result = await asyncio.to_thread(graph.invoke, {"messages": chat_history})
-                            
-                            # Extract new messages to send to FE
-                            new_messages = result["messages"][len(chat_history):]
-                            
-                            for msg in new_messages:
-                                if msg.type == "tool":
-                                    print(f"-> Gửi Tool Response ({msg.name}) về FE: {msg.content}")
-                                    await client_ws.send_text(json.dumps({
-                                        "type": "tool_response",
-                                        "tool_name": msg.name,
-                                        "content": msg.content
-                                    }, ensure_ascii=False))
-                                elif msg.type == "ai":
-                                    if hasattr(msg, "tool_calls") and getattr(msg, "tool_calls"):
-                                        for tc in msg.tool_calls:
-                                            print(f"-> Gọi tool: {tc['name']}({tc['args']})")
-                                            await client_ws.send_text(json.dumps({
-                                                "type": "tool_call",
-                                                "tool_name": tc['name'],
-                                                "args": tc['args']
-                                            }, ensure_ascii=False))
-                                    
-                                    if msg.content:
-                                        print(f"-> Agent Response: {msg.content}")
-                                        await client_ws.send_text(json.dumps({
-                                            "type": "agent_response",
-                                            "text": msg.content
-                                        }, ensure_ascii=False))
-                            
-                            # 3. Cập nhật lại toàn bộ history bao gồm các lệnh gọi tool
-                            chat_history = list(result["messages"])
+                            # 2. Chạy agent logic
+                            await run_agent_and_respond(transcript)
                         else:
                             print("-> Lỗi/Không nhận diện được giọng nói.")
                 except Exception as e:
@@ -128,8 +129,14 @@ async def websocket_endpoint(client_ws: WebSocket):
                     traceback.print_exc()
                     print(f"Lỗi phần xử lý Audio/Agent: {repr(e)}")
             elif msg_data.get("type") == "text":
-                # (Tương lai có thể hỗ trợ Frontend gửi text chat trực tiếp)
-                pass
+                transcript = msg_data.get("data", "").strip()
+                if transcript:
+                    print(f"-> Nhận Text từ FE: {transcript}")
+                    await client_ws.send_text(json.dumps({
+                        "type": "user_message",
+                        "text": transcript
+                    }))
+                    await run_agent_and_respond(transcript)
 
     except websockets.exceptions.ConnectionClosed:
         print("Frontend ngắt kết nối WebSocket.")
